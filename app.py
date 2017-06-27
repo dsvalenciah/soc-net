@@ -27,8 +27,9 @@ class User(HTTPMethodView):
 
     def post(self, request, _id):
         email = request.json.get('email', None)
-        password = request.json.get('password', None)
-        if not email or not password:
+        password = request.json.get('password_1', None)
+        name = request.json.get('name', None)
+        if not email or not password or not name:
             return json({
                 'error': {
                     'message': 'The name or password field is required',
@@ -37,7 +38,8 @@ class User(HTTPMethodView):
         new_user = {
             'id': uuid4().hex,
             'email': email,
-            'password': password
+            'password': password,
+            'name': name
         }
         USERS.append(new_user)
         return json(new_user, status=201)

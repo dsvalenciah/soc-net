@@ -12,13 +12,15 @@ class UserInput extends Component {
     super(props);
     this.state = {
       email: '',
-      password: '',
+      password_1: '',
+      password_2: '',
+      name: '',
       visible: false
     };
   }
 
   onDismiss() {
-    this.setState({ email: '', password: '', visible: false });
+    this.setState({ visible: false });
   }
 
   handleInvalidSubmit(event) {
@@ -32,7 +34,9 @@ class UserInput extends Component {
       .set('Accept', 'application/json')
       .then(res => {
         this.props.onCreated();
-        this.setState({email: '', password: '', visible: true});
+        this.setState(
+          {email: '', password_1: '', password_2: '', name: '', visible: true}
+        );
       }, err => {
         console.log(err);
       });
@@ -44,28 +48,68 @@ class UserInput extends Component {
         onValidSubmit={this.saveUser.bind(this)}
         onInvalidSubmit={this.handleInvalidSubmit.bind(this)}
       >
-      <Alert color="info"
-        isOpen={this.state.visible}
-        toggle={this.onDismiss.bind(this)}
-      >
-        ¡the user has ben created!
-      </Alert>
+        <Alert color="info"
+          isOpen={this.state.visible}
+          toggle={this.onDismiss.bind(this)}
+        >
+          ¡the user has ben created!
+        </Alert>
+
         <AvField
           name="email"
           type="email"
           value={this.state.email}
           onChange={e => this.setState({email: e.target.value})}
           placeholder="email"
-          required 
+          required
         />
+
         <AvField
-          name="password"
-          type="password"
-          value={this.state.password}
-          onChange={e => this.setState({password: e.target.value})}
-          placeholder="password"
-          required 
+          name="name"
+          type="text"
+          value={this.state.name}
+          onChange={e => this.setState({name: e.target.value})}
+          placeholder="name"
+          validate={
+            {pattern:
+              {value: /^[a-zA-Z ]{6,20}$/}
+            }
+          }
+          required
         />
+
+        <AvField
+          name="password_1"
+          type="password"
+          value={this.state.password_1}
+          onChange={e => this.setState({password_1: e.target.value})}
+          placeholder="password"
+          validate={
+            {pattern:
+              {value: /^((?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%]).{6,20})$/}
+            }
+          }
+          errorMessage="The password must have uppercase, lowercase, special characters and numbers"
+          required
+        />
+
+        <AvField
+          name="password_2"
+          type="password"
+          value={this.state.password_2}
+          onChange={e => this.setState({password_2: e.target.value})}
+          placeholder="password again"
+          validate={
+            {
+              match:{value:'password_1'},
+              pattern:
+                {value: /^((?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%]).{6,20})$/}
+              }
+          }
+          errorMessage="Password must match"
+          required
+        />
+
         <Button
           color="success"
         >Create User</Button>{' '}
@@ -75,7 +119,7 @@ class UserInput extends Component {
 
 }
 
-class TaskList extends Component {
+class UserList extends Component {
   constructor(props) {
     super(props);
     this.state = {
@@ -107,6 +151,7 @@ class TaskList extends Component {
                   <th><center>id</center></th>
                   <th><center>email</center></th>
                   <th><center>password</center></th>
+                  <th><center>name</center></th>
                 </tr>
               </thead>
               <tbody>
@@ -114,6 +159,7 @@ class TaskList extends Component {
                   <td>{ this.state.selected_user.id }</td>
                   <td>{ this.state.selected_user.email }</td>
                   <td>{ this.state.selected_user.password }</td>
+                  <td>{ this.state.selected_user.name }</td>
                 </tr>
               </tbody>
             </Table>
@@ -173,7 +219,7 @@ class App extends Component {
         <UserInput
           onCreated={() => this.fetchUsers()}
         />
-        <TaskList
+        <UserList
           users={this.state.users}
           onUpdate={() => this.fetchUsers()}
         />
