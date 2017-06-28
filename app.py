@@ -14,25 +14,22 @@ USERS = []
 
 class User(HTTPMethodView):
 
-    def get(self, request, _id):
+    def get(self, request, email):
         try:
-            user = next(x for x in USERS if x.get('id') == _id)
-            return json({
-                'data': user
-            })
+            user = next(user for user in USERS if user.get('email') == email)
+            return json({'data': user})
         except Exception:
-            return json({
-                'data': USERS,
-            })
+            return json({'data': USERS})
 
-    def post(self, request, _id):
+    def post(self, request, email):
         email = request.json.get('email', None)
-        password = request.json.get('password_1', None)
+        password = request.json.get('passwordA', None)
         name = request.json.get('name', None)
         if not email or not password or not name:
             return json({
                 'error': {
-                    'message': 'The name or password field is required',
+                    'message':
+                        'The name, password or email field is required',
                 }
             }, status=400)
         new_user = {
@@ -44,21 +41,21 @@ class User(HTTPMethodView):
         USERS.append(new_user)
         return json(new_user, status=201)
 
-    def put(self, request, _id):
+    def put(self, request, email):
         return json({})
 
-    def patch(self, request, _id):
+    def patch(self, request, email):
         return json({})
 
-    def delete(self, request, _id):
+    def delete(self, request, email):
         return json({})
 
-    def options(self, request, _id):
+    def options(self, request, email):
         return json({})
 
 
 CORS(app)
-app.add_route(User.as_view(), '/user/<_id>')
+app.add_route(User.as_view(), '/user/<email>')
 
 if __name__ == '__main__':
     app.run(
