@@ -2,9 +2,9 @@ import React, { Component } from 'react';
 import _ from 'lodash';
 import './App.css';
 import request from 'superagent';
-import { Button, Modal, ModalHeader, ModalBody, Alert, Table,
-  Navbar, NavbarBrand, Nav, NavItem, NavLink
-  } from 'reactstrap';
+import { Button, Modal, ModalHeader, ModalBody, Alert, Table, ButtonDropdown,
+         DropdownToggle, DropdownMenu, DropdownItem, Navbar, NavbarBrand, Nav,
+         NavItem, NavLink } from 'reactstrap';
 import { AvForm, AvField } from 'availity-reactstrap-validation';
 
 
@@ -26,25 +26,33 @@ class SignUpModal extends Component {
 
   handleInvalidSubmit(event) { console.log(this.state); }
 
-  saveUser(event) {
-    console.log("..........");
-    request('POST', 'http://0.0.0.0:8000/user/None')
-      .send(this.state)
+  createUser(event) {
+    request('POST', 'http://0.0.0.0:8000/create_user')
+      .send(
+        {
+          'email': this.state.email,
+          'password': this.state.passwordA,
+          'name': this.state.name
+        }
+      )
       .set('Content-Type', 'application/json')
       .set('Accept', 'application/json')
       .then(res => {
+        this.props.toggle();
         this.setState(
-          {email: '', passwordA: '', passwordB: '', name: ''}
+          { email: '', passwordA: '', passwordB: '', name: '' }
+        );
+        this.props.activeUser(
+          { 'email': res.body.data.email, 'name': res.body.data.name }
         );
       }, err => {
         console.log(err);
       });
   }
 
-  findEmailInDatabase(email) {
+  getUserByEmail(email) {
     if (email !== '') {
-      request('GET', `http://0.0.0.0:8000/user/${this.state.email}`)
-        .send(this.state)
+      request('GET', `http://0.0.0.0:8000/get_user/${this.state.email}`)
         .set('Content-Type', 'application/json')
         .set('Accept', 'application/json')
         .then(res => {
@@ -72,23 +80,23 @@ class SignUpModal extends Component {
         <ModalHeader toggle={this.props.toggle}>Sign-up</ModalHeader>
         <ModalBody>
           <AvForm
-            onValidSubmit={this.saveUser.bind(this)}
+            onValidSubmit={this.createUser.bind(this)}
             onInvalidSubmit={this.handleInvalidSubmit.bind(this)}
           >
 
-          <Alert
-            color="danger"
-            isOpen={this.state.alertVisible}
-            toggle={this.onDismiss.bind(this)}
-          >
-            {this.state.message} already exist in the database
-          </Alert>
+            <Alert
+              color="danger"
+              isOpen={this.state.alertVisible}
+              toggle={this.onDismiss.bind(this)}
+            >
+              {this.state.message} already exist in the database
+            </Alert>
 
             <AvField
               name="email"
               type="email"
               value={this.state.email}
-              onBlur={e => this.findEmailInDatabase(e.target.value)}
+              onBlur={e => this.getUserByEmail(e.target.value)}
               onClick={this.onDismiss.bind(this)}
               onChange={e => this.setState({email: e.target.value})}
               placeholder="email"
@@ -103,7 +111,7 @@ class SignUpModal extends Component {
               placeholder="name"
               validate={
                 {pattern:
-                  {value: /^[a-zA-Z ]{6,20}$/}
+                  {value: /^[a-zA-Z ]{3,40}$/}
                 }
               }
               required
@@ -161,7 +169,9 @@ class SignInModal extends Component {
     super(props);
     this.state = {
       email: '',
-      password: ''
+      password: '',
+
+      alertVisible: false
     };
   }
 
@@ -169,15 +179,26 @@ class SignInModal extends Component {
     console.log(this.state);
   }
 
-  getUser(event) {
-    request('GET', 'http://0.0.0.0:8000/user/None')
+  getUserByEmailPassword(event) {
+    request('POST', 'http://0.0.0.0:8000/get_user')
       .send(this.state)
       .set('Content-Type', 'application/json')
       .set('Accept', 'application/json')
       .then(res => {
-        this.setState(
-          {email: '', password: '', visible: true}
-        );
+        if (res.body.data.message === 'The email or password is not in database') {
+          this.props.activeUser(null);
+          this.setState(
+            { email: '', password: '', alertVisible: true }
+          );
+        } else {
+          this.props.activeUser(
+            { 'email': res.body.data.email, 'name': res.body.data.name }
+          );
+          this.props.toggle();
+          this.setState(
+            { email: '', password: '' }
+          );
+        }
       }, err => {
         console.log(err);
       });
@@ -185,7 +206,10 @@ class SignInModal extends Component {
 
   emailStateChange(event) {
     this.setState({email: event.target.value});
-    console.log(event);
+  }
+
+  onDismiss() {
+    this.setState({ alertVisible: false, message: '', email: '' });
   }
 
   render() {
@@ -198,9 +222,17 @@ class SignInModal extends Component {
 
         <ModalBody>
           <AvForm
-            onValidSubmit={this.getUser.bind(this)}
+            onValidSubmit={this.getUserByEmailPassword.bind(this)}
             onInvalidSubmit={this.handleInvalidSubmit.bind(this)}
           >
+
+            <Alert
+              color="danger"
+              isOpen={this.state.alertVisible}
+              toggle={this.onDismiss.bind(this)}
+            >
+              ¡the specified user is not exist in the database!
+            </Alert>
 
             <AvField
               name="email"
@@ -239,17 +271,17 @@ class SignInModal extends Component {
 class UserListModal extends Component {
   constructor(props) {
     super(props);
-    this.fetchUsers();
     this.state = {
       users: [],
       selected_user: '',
       modal: false
     };
+    this.getAllUsers();
   }
 
   toggle() {
     this.setState(
-      {modal: !this.state.modal}
+      { modal: !this.state.modal }
     );
   }
 
@@ -297,7 +329,7 @@ class UserListModal extends Component {
             <tbody>
               {
                 _.map(this.state.users, user => (
-                  <tr  key={user.id} onClick={() => this.getUser(user)}>
+                  <tr  key={user.id} onClick={() => this.getUserByEmail(user.email)}>
                     <th scope="row">{
                       _.findIndex(this.state.users, {id: user.id}) + 1
                     }</th>
@@ -313,77 +345,143 @@ class UserListModal extends Component {
     )
   }
 
-  fetchUsers() {
-    request('GET', 'http://0.0.0.0:8000/user/None')
+  getAllUsers() {
+    request('GET', 'http://0.0.0.0:8000/get_user')
       .set('Content-Type', 'application/json')
       .set('Accept', 'application/json')
       .then(res => {
-        this.setState({users: res.body.data});
+        this.setState({ users: res.body.data });
       }, err => {
         console.log(err);
       });
   }
 
-  getUser(user) {
-    request('GET', `http://localhost:8000/user/${user.email}`)
-      .set('Content-Type', 'application/json')
-      .set('Accept', 'application/json')
-      .then(res => {
-        this.setState({selected_user: res.body.data, modal: true});
-      }, err => {
-        console.log(err);
-      });
+  getUserByEmail(email) {
+    if (email !== '') {
+      request('GET', `http://0.0.0.0:8000/get_user/${email}`)
+        .set('Content-Type', 'application/json')
+        .set('Accept', 'application/json')
+        .then(res => {
+          this.setState(
+            { modal: true, selected_user: res.body.data }
+          );
+        }, err => {
+          console.log(err);
+        });
+    }
   }
 
 }
 
+/*
+class UserProfileModal extends Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      dropdownOpen: false
+    };
+  }
+
+
+
+  render() {
+    return (
+      <Modal
+        isOpen={this.props.isOpen}
+        toggle={this.props.toggle}
+      >
+        <ModalHeader toggle={this.props.toggle}>Sign-up</ModalHeader>
+        <ModalBody>
+          HELLO WORLD
+        </ModalBody>
+
+      </Modal>
+    )
+  }
+
+}
+*/
 
 class App extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      signIn: false,
-      signUp: false,
-      userList: false
+      signInOpen: false,
+      signUpOpen: false,
+      userListOpen: false,
+
+      activeUser: null,
+      userDropdownOpen: false
     };
   }
 
-  toggleSignIn() { this.setState({ signIn: !this.state.signIn }); }
-  toggleSignUp() { this.setState({ signUp: !this.state.signUp }); }
-  toggleUserList() { this.setState({ userList: !this.state.userList }); }
+  toggleSignIn() { this.setState({ signInOpen: !this.state.signInOpen }); }
+  toggleSignUp() { this.setState({ signUpOpen: !this.state.signUpOpen }); }
+  toggleUserList() { this.setState({ userListOpen: !this.state.userListOpen }); }
+  toggleUserOptions() { 
+    this.setState({ userDropdownOpen: !this.state.userDropdownOpen });
+  }
+
+  setActiveUser(user) { this.setState({activeUser: user}); }
 
   render() {
     return (
       <div className="App">
 
         <SignUpModal
-          isOpen={this.state.signUp}
+          isOpen={this.state.signUpOpen}
           toggle={this.toggleSignUp.bind(this)}
+          activeUser={this.setActiveUser.bind(this)}
         />
 
         <SignInModal
-          isOpen={this.state.signIn}
+          isOpen={this.state.signInOpen}
           toggle={this.toggleSignIn.bind(this)}
+          activeUser={this.setActiveUser.bind(this)}
         />
 
         <UserListModal
-          isOpen={this.state.userList}
+          isOpen={this.state.userListOpen}
           toggle={this.toggleUserList.bind(this)}
         />
 
         <Navbar color="faded" light toggleable>
           <NavbarBrand href="/">SocNet</NavbarBrand>
-          <Nav className="ml-auto" navbar>
-            <NavItem onClick={this.toggleUserList.bind(this)}>
-              <NavLink>User list</NavLink>
-            </NavItem>
-            <NavItem onClick={this.toggleSignIn.bind(this)}>
-              <NavLink>Sign in</NavLink>
-            </NavItem>
-            <NavItem onClick={this.toggleSignUp.bind(this)}>
-              <NavLink>Sign up</NavLink>
-            </NavItem>
-          </Nav>
+          {
+            this.state.activeUser?
+              <Nav className="ml-auto" navbar>
+                <ButtonDropdown
+                  isOpen={this.state.userDropdownOpen}
+                  toggle={this.toggleUserOptions.bind(this)}
+                >
+                  <Button id="caret">
+                  { this.state.activeUser.name }
+                  </Button>
+                  <DropdownToggle caret size="sm">
+                  </DropdownToggle>
+                  <DropdownMenu right>
+                    <DropdownItem header>User Options</DropdownItem>
+                    <DropdownItem>Searches</DropdownItem>
+                    <DropdownItem divider />
+                    <DropdownItem>Configuration</DropdownItem>
+                    <DropdownItem divider />
+                    <DropdownItem>Exit</DropdownItem>
+                  </DropdownMenu>
+                </ButtonDropdown>
+              </Nav>
+            :
+              <Nav className="ml-auto" navbar>
+                <NavItem onClick={this.toggleUserList.bind(this)}>
+                  <NavLink active>User list</NavLink>
+                </NavItem>
+                <NavItem onClick={this.toggleSignIn.bind(this)}>
+                  <NavLink active>Sign in</NavLink>
+                </NavItem>
+                <NavItem onClick={this.toggleSignUp.bind(this)}>
+                  <NavLink active>Sign up</NavLink>
+                </NavItem>
+              </Nav>
+          }
         </Navbar>
 
       </div>
